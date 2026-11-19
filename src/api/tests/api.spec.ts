@@ -126,6 +126,7 @@ function createMockInstance(overrides: MockOverrides = {}): DanteInstance {
 		checkAllFeedbacks: vi.fn(),
 		setActionDefinitions: vi.fn(),
 		setFeedbackDefinitions: vi.fn(),
+		setPresetDefinitions: vi.fn(),
 		setVariableDefinitions: vi.fn(),
 		setVariableValues: vi.fn(),
 		...overrides,
@@ -692,6 +693,9 @@ describe('scheduleCheckVariables', () => {
 				interval: 1000,
 				timeoutInterval: 3000,
 				createVariables: ['device', 'routing'],
+				routerPresets: false,
+				routerPresetsFilter: 'all',
+				routerPresetsDevices: '',
 				verbose: false,
 			},
 		})

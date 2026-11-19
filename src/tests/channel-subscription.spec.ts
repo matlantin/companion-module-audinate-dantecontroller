@@ -50,6 +50,7 @@ function instance(data: DevicesData = devicesData()) {
 		rxChannelsChoices: { [DEVICE_A]: [{ id: 1, label: 'In 1' }], [DEVICE_B]: [{ id: 1, label: 'In 1' }] },
 		txChannelsChoices: { [DEVICE_A]: [{ id: 1, label: 'Local Out' }], [DEVICE_B]: [{ id: 1, label: '01' }] },
 		setFeedbackDefinitions: vi.fn(),
+		setPresetDefinitions: vi.fn(),
 		checkFeedbacksById: vi.fn(),
 		log: vi.fn(),
 	} as unknown as DanteInstance

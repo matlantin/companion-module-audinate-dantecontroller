@@ -66,6 +66,7 @@ function instance(data: DevicesData = devicesData()) {
 		rxChannelsChoices: {},
 		txChannelsChoices: {},
 		setFeedbackDefinitions: vi.fn(),
+		setPresetDefinitions: vi.fn(),
 		setVariableDefinitions: vi.fn(),
 		setVariableValues: vi.fn(),
 		checkFeedbacksById: vi.fn(),

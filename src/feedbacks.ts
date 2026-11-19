@@ -40,6 +40,7 @@ import {
 } from './api/index.js'
 import { sanitiseVariableId } from './utils/sanitise.js'
 import type DanteInstance from './main.js'
+import { routerFeedbacks, type RouterFeedbackSchema } from './router.js'
 
 const logger = createModuleLogger('feedbacks')
 
@@ -101,7 +102,7 @@ export type FeedbackSchema = {
 	routing_bg_manual: { type: 'boolean'; options: RoutingBgManualOptions }
 	device_property: { type: 'value'; options: DevicePropertyOptions }
 	channel_subscription: { type: 'value'; options: ChannelSubscriptionOptions }
-}
+} & RouterFeedbackSchema
 
 /** True if a stored option value names a property this module knows. */
 function isDeviceProperty(value: string): value is DeviceProperty {
@@ -167,6 +168,79 @@ function sourceMatches(
 		(destinationSourceDeviceName == '.' && sameDeviceSelected)
 
 	return sourceDeviceMatches && sourceChannelMatches
+}
+
+/**
+ * Whether a destination channel is subscribed to a source channel, both given by number, and the
+ * subscription is working. The test *Crosspoint - Connected* makes, shared with the router feedbacks.
+ */
+export function crosspointConnectedByNumber(
+	self: DanteInstance,
+	channelType: ChannelMediaType,
+	destinationDeviceId: string,
+	destinationChannelNumber: number,
+	sourceDeviceId: string,
+	selectedSourceChannel: number,
+): boolean {
+	// Pickers store the device name; actions saved before that store an address. Both resolve.
+	const destinationDevice = deviceByIdentifier(self, destinationDeviceId)
+	const sourceDevice = deviceByIdentifier(self, sourceDeviceId)
+	// what the destination reports its source as - the picker holds the name, so it is known even
+	// while the source is offline
+	const sourceName = sourceDevice?.name ?? sourceDeviceId
+	if (!destinationDeviceId || !sourceDeviceId) return false
+	const isVideo = channelType === 'video'
+
+	if (isVideo) {
+		if (!destinationDevice?.videoRx) return false
+		const destinationChannel = destinationDevice.videoRx[destinationChannelNumber]
+		const sourceChannel =
+			sourceDevice?.videoTx?.[selectedSourceChannel] ??
+			findVideoTxChannelByName(self, sourceDeviceId, String(selectedSourceChannel))
+		// The destination reports its source by name, and both halves of that comparison used to
+		// be resolved from the *source* device's live record - so a source that had gone quiet
+		// made a route the destination still reports read as false. The picker already holds the
+		// name, and the retained choice list still holds the channel's, so neither needs the
+		// source to be reporting. What is *not* substituted is the route itself: an unrouted
+		// destination reports no source and matches nothing.
+		//
+		// The destination's own account of whether it has located the source, the test audio's
+		// subscription status makes. Like that one it does not depend on signal: the crosspoint
+		// reads as a baseband router reports one, connected whether or not its input carries
+		// anything, so a transmitter that loses its input stays connected. Naming a source is
+		// still not enough on its own - a subscription to a device that is not there names it too.
+		if (!isVideoSubscriptionConnected(destinationChannel)) return false
+
+		return sourceMatches(
+			destinationChannel,
+			selectedSourceChannel,
+			sourceChannel,
+			sourceName,
+			destinationDeviceId == sourceDeviceId,
+			rememberedTxChannelName(self, sourceName, 'video', selectedSourceChannel),
+		)
+	}
+
+	if (!destinationDevice?.audioRx) return false
+	const destinationChannel = destinationDevice.audioRx[destinationChannelNumber]
+	const sourceChannel =
+		sourceDevice?.audioTx?.[selectedSourceChannel] ??
+		findAudioTxChannelByName(self, sourceDeviceId, String(selectedSourceChannel))
+	// Audio does carry a subscription status, and it stays the gate: a destination reporting a
+	// broken subscription is not connected however well the names match. The name fallbacks
+	// below only decide *which* route is named, never whether it is healthy.
+	const subscriptionOk = isSubscriptionConnected(destinationChannel?.subscriptionStatus)
+	return (
+		subscriptionOk &&
+		sourceMatches(
+			destinationChannel,
+			selectedSourceChannel,
+			sourceChannel,
+			sourceName,
+			destinationDeviceId == sourceDeviceId,
+			rememberedTxChannelName(self, sourceName, 'audio', selectedSourceChannel),
+		)
+	)
 }
 
 /**
@@ -269,20 +343,11 @@ export function UpdateFeedbacks(self: DanteInstance): void {
 		},
 		callback: (feedback) => {
 			const opt = feedback.options
-			const isVideo = opt.channelType === 'video'
 			// Both dropdown ids are device IPs, so this instance's dependencies are known exactly.
 			trackFeedbackDevices(self, feedback.id, [
 				resolveDeviceIp(self, opt.destinationDevice),
 				resolveDeviceIp(self, opt.sourceDevice),
 			])
-			// Pickers store the device name; actions saved before that store an address. Both resolve.
-			const destinationDevice = deviceByIdentifier(self, opt.destinationDevice)
-			const sourceDevice = deviceByIdentifier(self, opt.sourceDevice)
-			// what the destination reports its source as - the picker holds the name, so it is known even
-			// while the source is offline
-			const sourceName = sourceDevice?.name ?? opt.sourceDevice
-			if (!opt.destinationDevice || !opt.sourceDevice) return false
-
 			const destinationChannelNumber = deviceOptionValue<number | undefined>(
 				self,
 				opt,
@@ -301,55 +366,13 @@ export function UpdateFeedbacks(self: DanteInstance): void {
 			// type - so there is nothing to check the feedback against, not merely "not connected".
 			if (destinationChannelNumber === undefined || selectedSourceChannel === undefined) return false
 
-			if (isVideo) {
-				if (!destinationDevice?.videoRx) return false
-				const destinationChannel = destinationDevice.videoRx[destinationChannelNumber]
-				const sourceChannel =
-					sourceDevice?.videoTx?.[selectedSourceChannel] ??
-					findVideoTxChannelByName(self, opt.sourceDevice, String(selectedSourceChannel))
-				// The destination reports its source by name, and both halves of that comparison used to
-				// be resolved from the *source* device's live record - so a source that had gone quiet
-				// made a route the destination still reports read as false. The picker already holds the
-				// name, and the retained choice list still holds the channel's, so neither needs the
-				// source to be reporting. What is *not* substituted is the route itself: an unrouted
-				// destination reports no source and matches nothing.
-				//
-				// The destination's own account of whether it has located the source, the test audio's
-				// subscription status makes. Like that one it does not depend on signal: the crosspoint
-				// reads as a baseband router reports one, connected whether or not its input carries
-				// anything, so a transmitter that loses its input stays connected. Naming a source is
-				// still not enough on its own - a subscription to a device that is not there names it too.
-				if (!isVideoSubscriptionConnected(destinationChannel)) return false
-
-				return sourceMatches(
-					destinationChannel,
-					selectedSourceChannel,
-					sourceChannel,
-					sourceName,
-					opt.destinationDevice == opt.sourceDevice,
-					rememberedTxChannelName(self, sourceName, 'video', selectedSourceChannel),
-				)
-			}
-
-			if (!destinationDevice?.audioRx) return false
-			const destinationChannel = destinationDevice.audioRx[destinationChannelNumber]
-			const sourceChannel =
-				sourceDevice?.audioTx?.[selectedSourceChannel] ??
-				findAudioTxChannelByName(self, opt.sourceDevice, String(selectedSourceChannel))
-			// Audio does carry a subscription status, and it stays the gate: a destination reporting a
-			// broken subscription is not connected however well the names match. The name fallbacks
-			// below only decide *which* route is named, never whether it is healthy.
-			const subscriptionOk = isSubscriptionConnected(destinationChannel?.subscriptionStatus)
-			return (
-				subscriptionOk &&
-				sourceMatches(
-					destinationChannel,
-					selectedSourceChannel,
-					sourceChannel,
-					sourceName,
-					opt.destinationDevice == opt.sourceDevice,
-					rememberedTxChannelName(self, sourceName, 'audio', selectedSourceChannel),
-				)
+			return crosspointConnectedByNumber(
+				self,
+				opt.channelType,
+				opt.destinationDevice,
+				destinationChannelNumber,
+				opt.sourceDevice,
+				selectedSourceChannel,
 			)
 		},
 	}
@@ -614,6 +637,7 @@ export function UpdateFeedbacks(self: DanteInstance): void {
 		routing_bg_manual: routingBgManual,
 		device_property: devicePropertyFeedback,
 		channel_subscription: channelSubscription,
+		...routerFeedbacks(self),
 	}
 
 	self.setFeedbackDefinitions(feedbacks)

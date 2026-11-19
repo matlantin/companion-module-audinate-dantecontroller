@@ -49,6 +49,7 @@ function instance(names: string[], remembered: string[] = []): DanteInstance {
 		debug: false,
 		setActionDefinitions: vi.fn(),
 		setFeedbackDefinitions: vi.fn(),
+		setPresetDefinitions: vi.fn(),
 		setVariableDefinitions: vi.fn(),
 		setVariableValues: vi.fn(),
 		checkAllFeedbacks: vi.fn(),

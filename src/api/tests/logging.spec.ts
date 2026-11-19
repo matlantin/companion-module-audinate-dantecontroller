@@ -70,6 +70,7 @@ function instance(records: Record<string, object> = {}, verbose = false): DanteI
 		config: { mac: 'x', interval: 1000, timeoutInterval: 3000, createVariables: ['device'], verbose },
 		setActionDefinitions: vi.fn(),
 		setFeedbackDefinitions: vi.fn(),
+		setPresetDefinitions: vi.fn(),
 		setVariableDefinitions: vi.fn(),
 		setVariableValues: vi.fn(),
 		checkFeedbacks: vi.fn(),

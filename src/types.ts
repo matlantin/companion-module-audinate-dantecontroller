@@ -1,6 +1,7 @@
 import type { ModuleConfig } from './config.js'
 import type { ActionSchema } from './actions.js'
 import type { FeedbackSchema } from './feedbacks.js'
+import type { DanteRouterVariables } from './router.js'
 
 /**
  * The per-device variables this module exposes, as suffix -> value type.
@@ -111,11 +112,11 @@ export type DanteDeviceVariableId = `${string}_${keyof DanteDeviceVariables & st
 export type DanteVariableValues = {
 	/** Names of all currently discovered devices. */
 	devices: string[]
-} & {
-	[Suffix in keyof DanteDeviceVariables as `${string}_${Suffix & string}`]: DanteDeviceVariables[Suffix] | undefined
-} & {
-	[Suffix in keyof DanteRoutingVariables as `${string}_${Suffix & string}`]: DanteRoutingVariables[Suffix] | undefined
-}
+} & DanteRouterVariables & {
+		[Suffix in keyof DanteDeviceVariables as `${string}_${Suffix & string}`]: DanteDeviceVariables[Suffix] | undefined
+	} & {
+		[Suffix in keyof DanteRoutingVariables as `${string}_${Suffix & string}`]: DanteRoutingVariables[Suffix] | undefined
+	}
 
 export interface DanteModuleTypes {
 	config: ModuleConfig

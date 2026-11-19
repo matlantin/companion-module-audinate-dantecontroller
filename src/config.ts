@@ -58,7 +58,50 @@ export type ModuleConfig = {
 	 * Replaced the `variables` and `routingVariables` checkboxes - see the upgrade scripts.
 	 */
 	createVariables: VariableGroup[]
+	/**
+	 * Whether the router panel presets are generated. Off by default: they are one button per
+	 * channel and per source mode, which on a large network is a great many presets. The router
+	 * actions and feedbacks are available either way.
+	 */
+	routerPresets: boolean
+	/** Which devices get router presets - see {@link routerPresetDeviceFilter}. */
+	routerPresetsFilter: RouterPresetsFilter
+	/** The device names `routerPresetsFilter` excludes or includes, comma separated, `*` as a wildcard. */
+	routerPresetsDevices: string
 	verbose: boolean
+}
+
+export type RouterPresetsFilter = 'all' | 'exclude' | 'include'
+
+/**
+ * Whether a device gets router presets under this config. `exclude` keeps every device but the
+ * listed ones, `include` keeps only the listed ones; anything else, a missing setting included,
+ * keeps them all. Names are matched whole and case-insensitively, `*` standing for any run of
+ * characters, so `MXN5-*` lists every device whose name starts with `MXN5-`.
+ */
+export function routerPresetDeviceFilter(
+	config: Partial<Pick<ModuleConfig, 'routerPresetsFilter' | 'routerPresetsDevices'>> | undefined,
+): (deviceName: string) => boolean {
+	const mode = config?.routerPresetsFilter
+	if (mode !== 'exclude' && mode !== 'include') return () => true
+	const patterns = deviceNamePatterns(config?.routerPresetsDevices)
+	const listed = (name: string) => patterns.some((pattern) => pattern.test(name))
+	return mode === 'exclude' ? (name) => !listed(name) : listed
+}
+
+function deviceNamePatterns(list: unknown): RegExp[] {
+	if (typeof list !== 'string') return []
+	return list
+		.split(/[,;\n]/)
+		.map((entry) => entry.trim())
+		.filter((entry) => entry !== '')
+		.map((entry) => {
+			const source = entry
+				.split('*')
+				.map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+				.join('.*')
+			return new RegExp(`^${source}$`, 'i')
+		})
 }
 
 /**
@@ -177,6 +220,9 @@ export function effectiveTimeout(config: Pick<ModuleConfig, 'interval' | 'timeou
 /** Shows the timeout warning field exactly when `effectiveTimeout` would override the configured value. */
 const TIMEOUT_WARNING_EXPRESSION = `$(options:timeoutInterval) < $(options:interval) * 2`
 
+/** The router preset filter fields only matter while the presets are generated. */
+const ROUTER_PRESETS_EXPRESSION = `$(options:routerPresets)`
+
 export function GetConfigFields(): SomeCompanionConfigField[] {
 	// "Automatic" rather than "All": the module listens on every interface for discovery, but a
 	// command to a device is sent carrying the address of the one interface that reaches it. Nothing acts
@@ -262,6 +308,44 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			choices: Object.entries(VARIABLE_GROUPS).map(([id, label]) => ({ id, label })),
 			default: ['device'] satisfies VariableGroup[],
 			sortSelection: true,
+		},
+
+		{
+			type: 'checkbox',
+			id: 'routerPresets',
+			label: 'Router Panel Presets',
+			width: 12,
+			default: false,
+			description:
+				'Generates ready-made router panel buttons: one per receive channel, two per transmit ' +
+				'channel, plus Take/Clear/Cancel. Off by default, as a large network makes a great many of ' +
+				'them. The Router actions and feedbacks are available either way.',
+		},
+
+		{
+			type: 'dropdown',
+			id: 'routerPresetsFilter',
+			label: 'Router Presets Devices',
+			width: 4,
+			choices: [
+				{ id: 'all', label: 'All devices' },
+				{ id: 'exclude', label: 'All devices except' },
+				{ id: 'include', label: 'Only these devices' },
+			] satisfies { id: RouterPresetsFilter; label: string }[],
+			default: 'all' satisfies RouterPresetsFilter,
+			isVisibleExpression: ROUTER_PRESETS_EXPRESSION,
+		},
+
+		{
+			type: 'textinput',
+			id: 'routerPresetsDevices',
+			label: 'Device Names',
+			width: 8,
+			default: '',
+			tooltip:
+				'Dante device names, separated by commas. * matches any characters, for example MXN5-* for ' +
+				'every device whose name starts with MXN5-. Not case-sensitive.',
+			isVisibleExpression: `${ROUTER_PRESETS_EXPRESSION} && $(options:routerPresetsFilter) != 'all'`,
 		},
 
 		{

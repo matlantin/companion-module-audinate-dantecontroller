@@ -54,6 +54,7 @@ function mockInstance() {
 		txChannelsChoices: { DeviceA: [{ id: 1, label: 'Out 1' }], DeviceB: [{ id: 1, label: 'Out 1' }] },
 		setActionDefinitions: vi.fn(),
 		setFeedbackDefinitions: vi.fn(),
+		setPresetDefinitions: vi.fn(),
 		log: vi.fn(),
 	} as unknown as DanteInstance
 }
@@ -915,6 +916,7 @@ describe('option ids are sanitised', () => {
 			txChannelsChoices: { [MESSY]: [{ id: 1, label: 'Out 1' }], DeviceB: [{ id: 1, label: 'Out 1' }] },
 			setActionDefinitions: vi.fn(),
 			setFeedbackDefinitions: vi.fn(),
+			setPresetDefinitions: vi.fn(),
 			log: vi.fn(),
 		} as unknown as DanteInstance
 	}
@@ -1019,6 +1021,7 @@ describe('per-device channel fields survive a device going offline', () => {
 			videoTxChannelsChoices: {},
 			setActionDefinitions: vi.fn(),
 			setFeedbackDefinitions: vi.fn(),
+			setPresetDefinitions: vi.fn(),
 			log: vi.fn(),
 		} as unknown as DanteInstance
 	}

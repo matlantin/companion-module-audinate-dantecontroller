@@ -17,6 +17,7 @@ import type { DanteVariableValues } from './types.js'
 import type DanteInstance from './main.js'
 import { sanitiseVariableId } from './utils/sanitise.js'
 import { VariablePublisher } from './variable-publisher.js'
+import { routerVariableDefinitions, routerVariableValues } from './router.js'
 import { brandedEntries, channelNumbers, type DeviceIp, type DeviceName } from './api/ids.js'
 
 const logger = createModuleLogger('variables')
@@ -52,6 +53,8 @@ export function UpdateVariableDefinitions(self: DanteInstance): void {
 	if (variablesEnabled(self.config, 'routing')) {
 		addRoutingDefinitions(self, variables)
 	}
+	// only the router panels in use, so a connection without router buttons has none
+	Object.assign(variables, routerVariableDefinitions(self))
 
 	variablePublisher(self).setDefinitions(variables)
 }
@@ -215,6 +218,9 @@ export function CheckVariables(self: DanteInstance, ipAddress?: DeviceIp, ...var
 	// Device properties are still tracked when their variables are off; the Device Property
 	// feedback reads them through the same accessor either way.
 	if (variablesEnabled(self.config, 'device')) addDevicePropertyValues(self, variableValues, ipAddress, variableTypes)
+
+	// the selected destination may be on any device, so these follow every update
+	Object.assign(variableValues, routerVariableValues(self))
 
 	try {
 		variablePublisher(self).setValues(variableValues)

@@ -74,6 +74,7 @@ function instance(): DanteInstance {
 		setVariableDefinitions: vi.fn(),
 		setActionDefinitions: vi.fn(),
 		setFeedbackDefinitions: vi.fn(),
+		setPresetDefinitions: vi.fn(),
 		log: vi.fn(),
 		updateStatus: vi.fn(),
 	} as unknown as DanteInstance

@@ -67,6 +67,7 @@ import {
 } from './api/index.js'
 import { sanitiseVariableId } from './utils/sanitise.js'
 import type DanteInstance from './main.js'
+import { routerActions, type RouterActionSchema } from './router.js'
 
 const logger = createModuleLogger('actions')
 
@@ -186,6 +187,57 @@ export type ActionSchema = {
 	setEncoding: { options: SetEncodingOptions }
 	setOutputLevel: { options: SetOutputLevelOptions }
 	refresh: { options: RefreshOptions }
+} & RouterActionSchema
+
+/**
+ * Routes a source channel, given by number, to a destination channel, resolving once the device
+ * has applied it. Source channel 0 clears the destination instead.
+ *
+ * Shared by *Crosspoint - Make* and the router actions, which both pick channels from dropdowns and
+ * so hold numbers, while Dante subscribes by name.
+ */
+export async function makeCrosspointByNumber(
+	self: DanteInstance,
+	channelType: ChannelMediaType,
+	destinationDeviceId: string,
+	destinationChannel: number,
+	sourceDeviceId: string,
+	sourceChannelNumber: number,
+	confirm: { signal?: AbortSignal },
+): Promise<void> {
+	const isVideo = channelType === 'video'
+
+	// No source means no route: clear the destination rather than subscribing it to nothing.
+	if (!sourceChannelNumber) {
+		if (isVideo) await clearVideoCrosspointConfirmed(self, destinationDeviceId, destinationChannel, confirm)
+		else await clearAudioCrosspointConfirmed(self, destinationDeviceId, destinationChannel, confirm)
+		return
+	}
+
+	// A route from an offline source is how Dante pre-patching works, so its names come from
+	// the picker and the remembered channel list when there is no live record to read them from.
+	const sourceDevice = deviceByIdentifier(self, sourceDeviceId)
+	const sourceName = sourceDevice?.name ?? sourceDeviceId
+	const liveChannelName = isVideo
+		? (
+				sourceDevice?.videoTx?.[sourceChannelNumber] ??
+				findVideoTxChannelByName(self, sourceDeviceId, String(sourceChannelNumber))
+			)?.name
+		: getChannelSubscriptionName(
+				sourceDevice?.audioTx?.[sourceChannelNumber] ??
+					findAudioTxChannelByName(self, sourceDeviceId, String(sourceChannelNumber)),
+			)
+	const sourceChannelName =
+		liveChannelName || rememberedTxChannelName(self, sourceName, channelType, sourceChannelNumber)
+	if (!sourceChannelName) {
+		throw new DanteCommandError(
+			`No name known for ${CHANNEL_MEDIA_TYPE_LABELS[channelType]} source channel ` +
+				`${sourceChannelNumber} on '${sourceDeviceId}' - Dante subscribes by name`,
+		)
+	}
+
+	const makeCrosspoint = isVideo ? makeVideoCrosspointConfirmed : makeAudioCrosspointConfirmed
+	await makeCrosspoint(self, destinationDeviceId, sourceChannelName, sourceName, destinationChannel, confirm)
 }
 
 /**
@@ -368,7 +420,6 @@ export function UpdateActions(self: DanteInstance): void {
 			},
 			callback: async (action, context) => {
 				const opt = action.options
-				const isVideo = opt.channelType === 'video'
 				const confirm = { signal: context.signal }
 				const sourcePrefix = channelOptionPrefix('sourceChannel', opt.channelType)
 				const destinationPrefix = channelOptionPrefix('destinationChannel', opt.channelType)
@@ -401,37 +452,15 @@ export function UpdateActions(self: DanteInstance): void {
 					)
 				}
 
-				// No source means no route: clear the destination rather than subscribing it to nothing.
-				if (!sourceChannelNumber) {
-					if (isVideo) await clearVideoCrosspointConfirmed(self, opt.destinationDevice, destinationChannel, confirm)
-					else await clearAudioCrosspointConfirmed(self, opt.destinationDevice, destinationChannel, confirm)
-					return
-				}
-
-				// A route from an offline source is how Dante pre-patching works, so its names come from
-				// the picker and the remembered channel list when there is no live record to read them from.
-				const sourceDevice = deviceByIdentifier(self, opt.sourceDevice)
-				const sourceName = sourceDevice?.name ?? opt.sourceDevice
-				const liveChannelName = isVideo
-					? (
-							sourceDevice?.videoTx?.[sourceChannelNumber] ??
-							findVideoTxChannelByName(self, opt.sourceDevice, String(sourceChannelNumber))
-						)?.name
-					: getChannelSubscriptionName(
-							sourceDevice?.audioTx?.[sourceChannelNumber] ??
-								findAudioTxChannelByName(self, opt.sourceDevice, String(sourceChannelNumber)),
-						)
-				const sourceChannelName =
-					liveChannelName || rememberedTxChannelName(self, sourceName, opt.channelType, sourceChannelNumber)
-				if (!sourceChannelName) {
-					throw new DanteCommandError(
-						`No name known for ${CHANNEL_MEDIA_TYPE_LABELS[opt.channelType]} source channel ` +
-							`${sourceChannelNumber} on '${opt.sourceDevice}' - Dante subscribes by name`,
-					)
-				}
-
-				const makeCrosspoint = isVideo ? makeVideoCrosspointConfirmed : makeAudioCrosspointConfirmed
-				await makeCrosspoint(self, opt.destinationDevice, sourceChannelName, sourceName, destinationChannel, confirm)
+				await makeCrosspointByNumber(
+					self,
+					opt.channelType,
+					opt.destinationDevice,
+					destinationChannel,
+					opt.sourceDevice,
+					sourceChannelNumber,
+					confirm,
+				)
 			},
 		},
 
@@ -1171,6 +1200,7 @@ export function UpdateActions(self: DanteInstance): void {
 				refreshArc(self, deviceIp)
 			},
 		},
+		...routerActions(self),
 	}
 
 	self.setActionDefinitions(actions)

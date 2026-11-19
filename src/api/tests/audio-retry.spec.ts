@@ -49,6 +49,7 @@ function instance(device: Record<string, unknown>): { self: DanteInstance; sent:
 		// a learnt channel list rebuilds the definitions
 		setActionDefinitions: vi.fn(),
 		setFeedbackDefinitions: vi.fn(),
+		setPresetDefinitions: vi.fn(),
 		setVariableDefinitions: vi.fn(),
 		setVariableValues: vi.fn(),
 		checkFeedbacks: vi.fn(),

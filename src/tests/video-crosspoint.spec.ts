@@ -91,6 +91,7 @@ function instance(data: DevicesData = devicesData(), overrides: Partial<DanteIns
 		counter: Buffer.from('0000', 'hex'),
 		setActionDefinitions: vi.fn(),
 		setFeedbackDefinitions: vi.fn(),
+		setPresetDefinitions: vi.fn(),
 		checkFeedbacksById: vi.fn(),
 		log: vi.fn(),
 		...overrides,

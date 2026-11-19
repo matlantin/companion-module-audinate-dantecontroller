@@ -24,6 +24,11 @@ It's based on Chris Ritsen's [Network audio controller](https://github.com/chris
     name, each receive channel's subscription and its state, and each device's name. Router
     integrations need these to show active routes and subscription health. A large network has a
     great many of them, so they are opted into; only values that change are sent.
+- **Router Panel Presets** — off by default. Generates the ready-made router panel buttons (see
+  _Router panel_ below). A large network makes a great many of them; the Router actions and
+  feedbacks are available either way.
+- **Router Presets Devices** and **Device Names** — shown while the router presets are on. Limits
+  them to some devices: _All devices except_ the ones listed, or _Only these devices_.
 - **Verbose Logging** — extra detail in the log, for troubleshooting.
 
 ## Devices
@@ -150,3 +155,79 @@ Per device, with the same `<device>` prefix:
 
 _Channel - Subscription_ and both _Crosspoint - Connected_ feedbacks take the same **Channel Type**
 option as the actions, and report on that kind of channel only.
+
+## Router panel
+
+An X-Y router panel: press a destination, then a source. The module keeps the selection, so a panel
+needs no custom variables.
+
+1. **Router - Select Destination** selects the destination. _Router - Destination Selected_ lights it.
+2. **Router - Select Source** then either routes that source to the selected destination at once
+   (**Mode: Route to the selected destination now**), or preselects it (**Mode: Preselect, route on
+   Take**), lit by _Router - Source Preselected_.
+3. **Router - Take** routes the preselected source. _Router - Take Armed_ lights the Take button while
+   a destination is selected and a source waits. **Router - Cancel** drops the preselected source,
+   **Router - Clear Destination** unsubscribes the selected destination.
+
+_Router - Source Routed to Selected Destination_ lights the source the selected destination is
+subscribed to, when that subscription works - the same test as _Crosspoint - Connected_. A route is
+confirmed as the Crosspoint actions are, so a refused one makes the action fail. Selecting another
+destination drops a preselected source; a failed Take keeps it, so it can be retried. Source and
+destination must be of the same Channel Type.
+
+### Presets
+
+Ready-made buttons are in the presets, once **Router Panel Presets** is ticked in the connection
+settings. They are built from the devices on the network and use the shared panel: **Router: destinations**
+and the two source sections, **Router: sources (with Take)** and **Router: sources (route
+immediately)**, have one group per device; **Router: controls** has Take, Clear, Cancel and a display
+of the selected destination and its source. Drag them onto a page.
+
+On a large network, **Router Presets Devices** limits the presets to some devices: _All devices
+except_ leaves out the devices listed in **Device Names**, _Only these devices_ keeps only them. List
+the Dante device names separated by commas; `*` matches any characters, so `MXN5-*` stands for every
+device whose name starts with `MXN5-`. Names are not case-sensitive. The controls are always there,
+and the Router actions and feedbacks still reach every device.
+
+### Variables
+
+A handful of variables describe the selection, created once a Router button is used, so a connection
+without any has none:
+
+- `router_destination_device`, `router_destination_channel`, `router_destination_label` - the
+  selected destination.
+- `router_destination_source` - what it is subscribed to, as `channel@device`, and
+  `router_destination_status` - the state of that subscription, as in the routing variables.
+- `router_pending_device`, `router_pending_channel`, `router_pending_label` - the source waiting for
+  Take.
+
+### Several operators
+
+Every Router action and feedback has a **Panel** option. Buttons with the same Panel share one
+selection; left empty, they use the connection-wide panel. Give each operator their own Panel name
+(for example `Op1` and `Op2`) so their selections stay apart. The option accepts variables:
+`$(this:page)` makes each page its own panel, so a router page can be copied for a second operator
+as is. Panel names are trimmed, and characters not allowed in a variable id become `_`.
+
+The Panel is set separately on each action and each feedback: a button's Router feedbacks must
+carry the same Panel as its Router actions, or they light from another panel's selection.
+
+The router variables describe the shared panel. A named panel publishes the same variables as soon as one of its
+buttons is shown or pressed, as `router_panel_<name>_…`, for example
+`$(Dante:router_panel_Op1_destination_label)`.
+
+### Presets on a named panel
+
+The presets use the shared panel. To put them on a named panel, set the Panel in each Router action
+and each Router feedback of the button, and, on the Take and selection display buttons, point their
+text at the panel's variables. With `$(this:page)`, the panel's name is the page number. On page 6,
+with the connection's default label `Dante` (the part before the colon is the connection's label: use
+yours if it was renamed):
+
+- Take: `TAKE\n$(Dante:router_panel_6_pending_label)`
+- Selected destination and its source:
+  `$(Dante:router_panel_6_destination_label)\n$(Dante:router_panel_6_destination_source)`
+
+Button text cannot nest a variable inside another's name, so the page number is written out: a page
+copied to another number routes on its own panel straight away, but these two texts need the new
+number.

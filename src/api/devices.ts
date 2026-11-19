@@ -8,6 +8,7 @@ import { createModuleLogger } from '@companion-module/base'
 import { collidingIds } from '../utils/sanitise.js'
 import { UpdateActions } from '../actions.js'
 import { UpdateFeedbacks } from '../feedbacks.js'
+import { UpdatePresetDefinitions } from '../presets.js'
 import { UpdateVariableDefinitions, CheckVariables } from '../variables.js'
 import { listNetworkInterfaces, findInterfaceForAddress } from '../config.js'
 import type DanteInstance from '../main.js'
@@ -923,6 +924,7 @@ export function updateData(self: DanteInstance): void {
 	UpdateVariableDefinitions(self)
 	CheckVariables(self)
 	UpdateFeedbacks(self)
+	UpdatePresetDefinitions(self)
 	// a full rebuild is not attributable to one device
 	scheduleCheckFeedbacks(self)
 }

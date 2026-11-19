@@ -80,6 +80,7 @@ function instance(data: DevicesData = devicesData()) {
 		txChannelsChoices: channelChoicesFor(data, 'tx'),
 		setActionDefinitions: vi.fn(),
 		setFeedbackDefinitions: vi.fn(),
+		setPresetDefinitions: vi.fn(),
 		checkFeedbacksById: vi.fn(),
 		log: vi.fn(),
 	} as unknown as DanteInstance
